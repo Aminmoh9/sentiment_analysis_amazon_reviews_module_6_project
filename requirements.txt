@@ -1,0 +1,10 @@
+streamlit
+pandas
+plotly
+numpy
+langchain
+langchain-openai
+langchain-pinecone
+pinecone-client
+openai
+python-dotenv

@@ -1,25 +1,22 @@
-try:
-    from langchain_openai import ChatOpenAI
-    from langchain.chains import RetrievalQA
-except ImportError:
-    # Fallback imports for older versions
-    try:
-        from langchain.llms import OpenAI as ChatOpenAI
-        from langchain.chains import RetrievalQA
-    except ImportError:
-        ChatOpenAI = None
-        RetrievalQA = None
+# [file name]: src/chatbot.py
+"""
+Chatbot core functionality for RAG system
+"""
+from langchain_openai import ChatOpenAI
+from langchain.chains import RetrievalQA
 
 def create_qa_chain(vectorstore, model_name="gpt-3.5-turbo"):
+    """Create a QA chain for the RAG system"""
     llm = ChatOpenAI(model_name=model_name, temperature=0)
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
-        retriever=vectorstore.as_retriever(search_type="similarity", search_kwargs={"k":5})
+        retriever=vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
     )
     return qa_chain
 
 def ask_question(qa_chain, query):
+    """Ask a question using the QA chain"""
     return qa_chain.run(query)
 
 def ask_question_with_sources(vectorstore, query, model_name="gpt-3.5-turbo", search_query=None):
@@ -29,7 +26,6 @@ def ask_question_with_sources(vectorstore, query, model_name="gpt-3.5-turbo", se
     actual_search_query = search_query if search_query else query
     
     # Use MMR (Maximum Marginal Relevance) for more diverse results
-    # This reduces redundancy and increases diversity in retrieved documents
     retriever = vectorstore.as_retriever(
         search_type="mmr", 
         search_kwargs={
@@ -72,7 +68,7 @@ Context:
 Question: {query}
 
 Please provide a helpful answer based on the reviews above."""
-    
+
     answer = llm.predict(prompt)
     
     return {

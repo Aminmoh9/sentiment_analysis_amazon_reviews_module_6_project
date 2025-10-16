@@ -52,7 +52,7 @@ def analyze_with_agent_safely(agent, query, df):
     try:
         # Enhanced prompt to prevent code generation issues
         dataset_context = f"""
-        You are analyzing an Amazon product reviews dataset with the following structure:
+        You are an experienced data analyst and analyzing an Amazon product reviews dataset with the following structure:
         - {len(df)} total reviews
         - Columns available: {', '.join(df.columns.tolist())}
         - Date range: {df['review_date'].min().strftime('%Y-%m-%d')} to {df['review_date'].max().strftime('%Y-%m-%d')}
@@ -67,27 +67,21 @@ def analyze_with_agent_safely(agent, query, df):
         - price: Product price (may have missing values)
         
         IMPORTANT INSTRUCTIONS:
-        1. DO NOT generate Python code with unterminated strings
-        2. DO NOT use matplotlib for visualizations
+        1. Generate data driven results
+        2. Start your answer with visualizations or tables
         3. Provide analysis in clear text with statistics
         4. If you need to analyze seasonal patterns, describe the patterns you would look for
-        5. Focus on insights and business implications
+        5. Focus on insights and business implications for the Amazon
+        6. Focus on getting the result instead of discussing how to get it done
         
         Please provide a clear, data-driven answer to the user's question without generating problematic code.
         """
         
         enhanced_query = f"""
-        {dataset_context}
         
         User Question: {query}
         
-        Please analyze the data and provide:
-        1. A clear answer to the question
-        2. Relevant statistics and insights
-        3. Any interesting patterns or trends found
-        4. Business implications
-        
-        Think step by step but DO NOT generate Python code with syntax errors.
+        Answer: 
         """
              # After getting the response, check if it's theoretical
         response_text = response["output"] if isinstance(response, dict) and "output" in response else str(response)
@@ -605,7 +599,6 @@ def render_interactive_analyst_tab(df_filtered):
         - "Which product categories have the most inconsistent ratings?"
         - "How has the average rating changed over time for different categories?"
         - "What factors are most correlated with positive reviews?"
-        - "Compare the sentiment distribution between verified and unverified purchases"
         - "Analyze seasonal patterns in review volume and sentiment"
         """)
     

@@ -71,32 +71,59 @@ def create_vector_store(df, index_name="amazon-reviews", force_recreate=False):
     
     # Combine review title + review text for better semantic search
     texts = []
-    for title, text, prod_title in zip(review_title, review_text, product_title):
+    for idx, (title, text, prod_title) in enumerate(zip(review_title, review_text, product_title)):
         combined_text = f"Product: {prod_title}. Review: {title}. {text}"
         # Ensure we have some content
         if combined_text.strip() in ["", ".", "Product: . Review: ."]:
             combined_text = "No review content available"
         texts.append(combined_text)
         
+        # 🔥 FIX: Handle review_date safely
+        review_date = df.iloc[idx]["review_date"] if idx < len(df) else ""
+        review_date_str = ""
+        
+        try:
+            if pd.notna(review_date) and review_date != "":
+                # If it's already a datetime object
+                if hasattr(review_date, 'strftime'):
+                    review_date_str = review_date.strftime("%Y-%m-%d")
+                # If it's a string, try to parse it
+                elif isinstance(review_date, str):
+                    # Try to convert string to datetime first
+                    try:
+                        date_obj = pd.to_datetime(review_date)
+                        review_date_str = date_obj.strftime("%Y-%m-%d")
+                    except:
+                        # If conversion fails, use the string as-is (if it looks like a date)
+                        if len(review_date) >= 8:  # Basic check if it might be a date
+                            review_date_str = review_date
+                        else:
+                            review_date_str = ""
+                else:
+                    review_date_str = str(review_date)
+        except Exception as date_error:
+            print(f"Warning: Could not process date {review_date}: {date_error}")
+            review_date_str = ""
+        
         # Prepare metadata for this row
-        price_value = df.loc[df.index[texts.index(combined_text)], "price"] if len(texts) <= len(df) else ""
+        price_value = df.iloc[idx]["price"] if idx < len(df) else ""
         if pd.notna(price_value) and str(price_value).strip() and str(price_value).lower() not in ['nan', 'none', 'null']:
             price_clean = str(price_value).strip()
         else:
             price_clean = ""
         
         # Use main_image if available, otherwise empty string
-        image_url = df.loc[df.index[texts.index(combined_text)], "main_image"] if "main_image" in df.columns and len(texts) <= len(df) else ""
+        image_url = df.iloc[idx]["main_image"] if "main_image" in df.columns and idx < len(df) else ""
         
         metadata_list.append({
-            "asin": clean_value(df.loc[df.index[texts.index(combined_text)], "asin"]),
+            "asin": clean_value(df.iloc[idx]["asin"] if idx < len(df) else ""),
             "product_title": clean_value(prod_title),
             "review_title": clean_value(title),
-            "main_category": clean_value(df.loc[df.index[texts.index(combined_text)], "main_category"]),
+            "main_category": clean_value(df.iloc[idx]["main_category"] if idx < len(df) else ""),
             "image": clean_value(image_url),
-            "review_date": df.loc[df.index[texts.index(combined_text)], "review_date"].strftime("%Y-%m-%d") if pd.notna(df.loc[df.index[texts.index(combined_text)], "review_date"]) else "",
-            "sentiment": clean_value(df.loc[df.index[texts.index(combined_text)], "sentiment"]),
-            "rating": clean_value(df.loc[df.index[texts.index(combined_text)], "rating"]),
+            "review_date": review_date_str,  # 🔥 Use the safely processed date
+            "sentiment": clean_value(df.iloc[idx]["sentiment"] if idx < len(df) else ""),
+            "rating": clean_value(df.iloc[idx]["rating"] if idx < len(df) else ""),
             "price": price_clean
         })
     

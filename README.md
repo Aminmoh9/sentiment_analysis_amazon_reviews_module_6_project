@@ -1,6 +1,4 @@
 
-
-
 amazon-reviews-analytics/
 ├── app.py                          # Main Streamlit app
 ├── requirements.txt                # Dependencies

@@ -45,6 +45,27 @@ def main():
         st.sidebar.markdown("---")
         display_api_status()
     
+    # 🔥 REPLACE THIS ENTIRE SECTION with the safer version:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🗄️ Vector Store")
+    
+    # Simple rebuild button without complex checking
+    if st.sidebar.button("🔄 Build/Refresh Vector Store", key="vector_rebuild"):
+        with st.spinner("Building vector store (this may take a few minutes)..."):
+            try:
+                from utils.data_loader import load_dataset
+                from src.pinecone_utils import create_vector_store
+                
+                df_full = load_dataset()
+                if not df_full.empty:
+                    create_vector_store(df_full, "amazon-reviews", force_recreate=True)
+                    st.sidebar.success("✅ Vector store built successfully!")
+                    st.sidebar.info("Chatbot features are now ready.")
+                else:
+                    st.sidebar.error("❌ No data available to build vector store")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error building vector store: {str(e)}")
+    
     # Check if data is loaded
     if df_filtered is None or len(df_filtered) == 0:
         st.error("❌ No data available. Please check your data files or adjust filters.")
@@ -55,6 +76,26 @@ def main():
         3. Verify file formats and column names
         4. Run preprocessing: `python src/preprocess_data.py`
         """)
+        
+        # Show Pinecone rebuild option in main area too
+        st.markdown("---")
+        st.markdown("### 🗄️ Vector Store Setup")
+        if st.button("🔄 Build Pinecone Vector Store", key="rebuild_main"):
+            with st.spinner("Building Pinecone index with all data..."):
+                try:
+                    from src.pinecone_utils import create_vector_store
+                    from utils.data_loader import load_dataset
+                    
+                    df_full = load_dataset()
+                    if not df_full.empty:
+                        vectorstore = create_vector_store(df_full, "amazon-reviews", force_recreate=True)
+                        st.success(f"✅ Pinecone index rebuilt with {len(df_full)} records!")
+                        st.info("Please refresh the page to use the chatbot features.")
+                    else:
+                        st.error("❌ No data loaded from CSV")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error rebuilding: {e}")
         return
     
     # Create tabs for different analysis views

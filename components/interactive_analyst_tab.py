@@ -49,90 +49,100 @@ def get_pandas_agent(df):
 
 def analyze_with_agent_safely(agent, query, df):
     """Use agent to analyze data with robust error handling"""
+    
+    # Enhanced prompt to prevent code generation issues
+    dataset_context = f"""
+    You are an experienced data analyst and analyzing an Amazon product reviews dataset with the following structure:
+    - {len(df)} total reviews
+    - Columns available: {', '.join(df.columns.tolist())}
+    - Date range: {df['review_date'].min().strftime('%Y-%m-%d')} to {df['review_date'].max().strftime('%Y-%m-%d')}
+    - {df['main_category'].nunique()} product categories
+    - Average rating: {df['rating'].mean():.2f}/5
+    
+    **SAMPLE DATA (first 3 rows):**
+    {df.head(3).to_string()}
+    
+    **DATA DICTIONARY:**
+    - asin: Product ID
+    - rating: Numerical rating from 1-5 stars
+    - review_title: Title of the review
+    - review_text: Full review content  
+    - review_date: Date when review was posted
+    - year: Year extracted from review_date
+    - sentiment: Categorical (Positive, Neutral, Negative)  
+    - product_title: Name of the product
+    - main_category: Product category
+    - price: Product price in USD format (may have missing values)
+    
+    **DATA QUALITY NOTES:**
+    - Price column has missing values (NaN) - handle appropriately
+    - Sentiment is derived from rating (4-5: Positive, 3: Neutral, 1-2: Negative)
+    - Reviews span multiple years (20005-2023 based on sample)
+    
+    IMPORTANT INSTRUCTIONS:
+    1. Generate data driven results using ACTUAL data analysis
+    2. Start your answer with visualizations or tables when possible
+    3. Provide analysis in clear text with statistics
+    4. Focus on insights and business implications for Amazon
+    5. If data is insufficient, suggest what additional data would be helpful
+    6. Handle missing price values gracefully in analysis
+    7. DO NOT generate theoretical approaches - provide actual findings
+    
+    **VISUALIZATION GUIDANCE:**
+    Based on your analysis, suggest specific visualizations that would help illustrate your findings.
+    Use these patterns:
+    - For price analysis: "This could be visualized with a price distribution histogram"
+    - For temporal trends: "A line chart of monthly review volume would illustrate this trend well"
+    - For categories: "A bar chart of top categories by review volume would show this distribution clearly"
+    - For sentiment: "A pie chart of sentiment distribution would demonstrate this pattern effectively"
+    
+    Please provide a clear, data-driven answer to the user's question without generating problematic code.
+    """
+    
+    enhanced_query = f"{dataset_context}\n\nUser Question: {query}\n\nAnswer:"
+    
     try:
-        # Enhanced prompt to prevent code generation issues
-        dataset_context = f"""
-        You are an experienced data analyst and analyzing an Amazon product reviews dataset with the following structure:
-        - {len(df)} total reviews
-        - Columns available: {', '.join(df.columns.tolist())}
-        - Date range: {df['review_date'].min().strftime('%Y-%m-%d')} to {df['review_date'].max().strftime('%Y-%m-%d')}
-        - {df['main_category'].nunique()} product categories
-        - Average rating: {df['rating'].mean():.2f}/5
-        
-        Important columns:
-        - rating: Numerical rating from 1-5 stars
-        - sentiment: Categorical (Positive, Neutral, Negative)  
-        - main_category: Product category
-        - review_date: Date of review
-        - price: Product price (may have missing values)
-        
-        IMPORTANT INSTRUCTIONS:
-        1. Generate data driven results
-        2. Start your answer with visualizations or tables
-        3. Provide analysis in clear text with statistics
-        4. If you need to analyze seasonal patterns, describe the patterns you would look for
-        5. Focus on insights and business implications for the Amazon
-        6. Focus on getting the result instead of discussing how to get it done
-        
-        Please provide a clear, data-driven answer to the user's question without generating problematic code.
-        """
-        
-        enhanced_query = f"""
-        
-        User Question: {query}
-        
-        Answer: 
-        """
-             # After getting the response, check if it's theoretical
-        response_text = response["output"] if isinstance(response, dict) and "output" in response else str(response)
-        
-        # Check if response is theoretical (mentions "we would need to" or similar)
-        theoretical_indicators = [
-            'we would need to', 'we can approach', 'calculate the', 'group by',
-            'identify patterns', 'look for', 'analyze the data', 'steps to'
-        ]
-        
-        if any(indicator in response_text.lower() for indicator in theoretical_indicators):
-            st.info("🔍 Agent provided theoretical framework - generating actual data analysis...")
-            if any(word in query.lower() for word in ['seasonal', 'month', 'pattern', 'trend']):
-                return enhanced_seasonal_fallback(query, df), None, "enhanced_fallback"
-        
-        return response_text, None, "agent_analysis"
-        
-    except Exception as e:
-        
         # Try invoking the agent with proper error handling
-        try:
-            with st.spinner("🤖 Agent is analyzing the data..."):
-                response = agent.invoke({"input": enhanced_query})
-                
-                # Handle different response formats
-                if isinstance(response, dict):
-                    if "output" in response:
-                        return response["output"], None, "agent_analysis"
-                    else:
-                        return str(response), None, "agent_analysis"
-                else:
-                    return str(response), None, "agent_analysis"
-                    
-        except Exception as invoke_error:
-            error_msg = str(invoke_error)
-            if "max iterations" in error_msg.lower() or "stopped" in error_msg.lower():
-                return "Agent analysis was stopped to prevent infinite loops. The question may be too complex for automated analysis. Try rephrasing or using the visualization tools below.", None, "agent_limited"
+        with st.spinner("🤖 Agent is analyzing the data..."):
+            response = agent.invoke({"input": enhanced_query})
+            
+            # Handle different response formats
+            if isinstance(response, dict):
+                response_text = response.get("output", str(response))
             else:
-                raise invoke_error
-        
+                response_text = str(response)
+            
+            # Check if response is theoretical (mentions "we would need to" or similar)
+            theoretical_indicators = [
+                'we would need to', 'we can approach', 'calculate the', 'group by',
+                'identify patterns', 'look for', 'analyze the data', 'steps to'
+            ]
+            
+            if any(indicator in response_text.lower() for indicator in theoretical_indicators):
+                st.info("🔍 Agent provided theoretical framework - generating actual data analysis...")
+                if any(word in query.lower() for word in ['seasonal', 'month', 'pattern', 'trend']):
+                    return enhanced_seasonal_fallback(query, df), None, "enhanced_fallback"
+                elif any(word in query.lower() for word in ['price', 'cost']):
+                    return enhanced_price_fallback(query, df), None, "enhanced_fallback"
+                else:
+                    return enhanced_general_fallback(query, df), None, "enhanced_fallback"
+            
+            return response_text, None, "agent_analysis"
+            
     except Exception as e:
-        error_msg = f"Agent analysis failed: {str(e)}"
-        st.warning(f"⚠️ {error_msg}")
-        
-        # Enhanced fallback for seasonal analysis
-        if any(word in query.lower() for word in ['seasonal', 'month', 'pattern', 'trend']):
-            return enhanced_seasonal_fallback(query, df), None, "fallback_analysis"
-        
-        # Fallback to safe analysis for common queries
-        fallback_response = fallback_analysis(query, df)
-        return fallback_response, None, "fallback_analysis"
+        error_msg = str(e)
+        if "max iterations" in error_msg.lower() or "stopped" in error_msg.lower():
+            return "Agent analysis was stopped to prevent infinite loops. The question may be too complex for automated analysis. Try rephrasing or using the visualization tools below.", None, "agent_limited"
+        else:
+            st.warning(f"⚠️ Agent analysis failed: {error_msg}")
+            
+            # Enhanced fallback based on query type
+            if any(word in query.lower() for word in ['seasonal', 'month', 'pattern', 'trend']):
+                return enhanced_seasonal_fallback(query, df), None, "fallback_analysis"
+            elif any(word in query.lower() for word in ['price', 'cost']):
+                return enhanced_price_fallback(query, df), None, "fallback_analysis"
+            else:
+                return enhanced_general_fallback(query, df), None, "fallback_analysis"
 
 def enhanced_seasonal_fallback(query, df):
     """Enhanced fallback specifically for seasonal pattern questions"""
@@ -208,6 +218,336 @@ def enhanced_seasonal_fallback(query, df):
         
     except Exception as e:
         return f"Seasonal analysis failed: {str(e)}"
+
+def enhanced_price_fallback(query, df):
+    """Enhanced fallback specifically for price-related questions"""
+    try:
+        if 'price' not in df.columns:
+            return "Price data is not available in this dataset."
+        
+        # Check if we have any price data
+        price_data = df[df['price'].notna()]
+        if len(price_data) == 0:
+            return "No price data available for analysis. All price values are missing."
+        
+        # Convert price to numeric
+        price_data = price_data.copy()
+        price_data['price_numeric'] = (
+            price_data['price']
+            .astype(str)
+            .str.replace('$', '', regex=False)
+            .str.replace(',', '', regex=False)
+            .str.strip()
+        )
+        # Filter out empty strings after cleaning
+        price_data = price_data[price_data['price_numeric'] != '']
+        price_data['price_numeric'] = price_data['price_numeric'].astype(float)
+        
+        if len(price_data) == 0:
+            return "No valid price data available for analysis."
+        
+        # Create price ranges
+        price_ranges = [0, 25, 50, 100, 200, float('inf')]
+        price_labels = ['<$25', '$25-50', '$50-100', '$100-200', '>$200']
+        
+        price_data['price_range'] = pd.cut(
+            price_data['price_numeric'],
+            bins=price_ranges,
+            labels=price_labels
+        )
+        
+        # Analyze by price range
+        analysis_results = []
+        
+        # Price range distribution
+        range_dist = price_data['price_range'].value_counts().sort_index()
+        analysis_results.append("**📊 Price Range Distribution:**")
+        for price_range, count in range_dist.items():
+            pct = (count / len(price_data)) * 100
+            analysis_results.append(f"- {price_range}: {count:,} products ({pct:.1f}%)")
+        
+        # Sentiment by price range
+        if 'sentiment' in price_data.columns:
+            sentiment_by_price = pd.crosstab(
+                price_data['price_range'], 
+                price_data['sentiment'], 
+                normalize='index'
+            ) * 100
+            
+            analysis_results.append("\n**🎭 Sentiment by Price Range:**")
+            for price_range in price_labels:
+                if price_range in sentiment_by_price.index:
+                    row = sentiment_by_price.loc[price_range]
+                    analysis_results.append(f"**{price_range}:**")
+                    for sentiment in ['Positive', 'Neutral', 'Negative']:
+                        if sentiment in row:
+                            analysis_results.append(f"  - {sentiment}: {row[sentiment]:.1f}%")
+        
+        # Rating by price range
+        if 'rating' in price_data.columns:
+            rating_by_price = price_data.groupby('price_range')['rating'].mean()
+            analysis_results.append("\n**⭐ Average Rating by Price Range:**")
+            for price_range in price_labels:
+                if price_range in rating_by_price.index:
+                    analysis_results.append(f"- {price_range}: {rating_by_price[price_range]:.2f}⭐")
+        
+        # Summary statistics
+        avg_price = price_data['price_numeric'].mean()
+        median_price = price_data['price_numeric'].median()
+        analysis_results.append(f"\n**💰 Price Statistics:**")
+        analysis_results.append(f"- Average price: ${avg_price:.2f}")
+        analysis_results.append(f"- Median price: ${median_price:.2f}")
+        analysis_results.append(f"- Products with price data: {len(price_data):,} of {len(df):,} total")
+        
+        return "\n".join(analysis_results)
+        
+    except Exception as e:
+        return f"Price analysis failed: {str(e)}"
+
+def enhanced_general_fallback(query, df):
+    """Enhanced fallback for general queries"""
+    try:
+        query_lower = query.lower()
+        
+
+                # Review length analysis
+        if any(word in query_lower for word in ['review length', 'correlation', 'word count', 'text length']):
+            if 'review_text' in df.columns or 'review_title' in df.columns:
+                # Calculate review length
+                df_analysis = df.copy()
+                df_analysis['review_title'] = df_analysis['review_title'].fillna('')
+                df_analysis['review_text'] = df_analysis['review_text'].fillna('')
+                df_analysis['full_review'] = df_analysis['review_title'] + ' ' + df_analysis['review_text']
+                df_analysis['review_length'] = df_analysis['full_review'].str.len()
+                df_analysis = df_analysis[df_analysis['review_length'] > 0]
+                
+                if len(df_analysis) == 0:
+                    return "No review text available for length analysis."
+                
+                # Calculate correlation
+                correlation = df_analysis['review_length'].corr(df_analysis['rating'])
+                
+                # Calculate average lengths by rating
+                avg_by_rating = df_analysis.groupby('rating')['review_length'].mean()
+                
+                response = [
+                    f"**📊 Review Length vs Rating Analysis:**",
+                    f"",
+                    f"**Correlation Coefficient:** {correlation:.3f}",
+                    f"",
+                    f"**Interpretation:**",
+                    f"- {'Negative' if correlation < 0 else 'Positive'} correlation",
+                    f"- {'Weak' if abs(correlation) < 0.3 else 'Moderate' if abs(correlation) < 0.7 else 'Strong'} relationship",
+                    f"",
+                    f"**Average Review Length by Rating:**"
+                ]
+                
+                for rating in sorted(avg_by_rating.index):
+                    response.append(f"- {rating}⭐: {avg_by_rating[rating]:.0f} characters")
+                
+                response.extend([
+                    f"",
+                    f"**Insight:** {'Longer reviews tend to have lower ratings' if correlation < 0 else 'Longer reviews tend to have higher ratings'}",
+                    f"",
+                    f"💡 **Visualization:** A scatter plot showing review length vs rating would illustrate this relationship clearly."
+                ])
+                
+                return "\n".join(response)
+            
+        # Rating distribution analysis
+        if any(word in query_lower for word in ['rating', 'star', 'score']):
+            result = df['rating'].value_counts().sort_index()
+            response = [
+                "**⭐ Rating Distribution Analysis:**",
+                ""
+            ]
+            total = len(df)
+            for rating, count in result.items():
+                percentage = (count / total) * 100
+                response.append(f"- {rating}⭐: {count:,} reviews ({percentage:.1f}%)")
+            
+            avg_rating = df['rating'].mean()
+            response.extend([
+                "",
+                f"**📊 Summary Statistics:**",
+                f"- Average rating: {avg_rating:.2f}⭐",
+                f"- Total reviews analyzed: {total:,}",
+                f"- Most common rating: {result.idxmax()}⭐ ({result.max():,} reviews)"
+            ])
+            return "\n".join(response)
+        
+        # Sentiment analysis
+        elif any(word in query_lower for word in ['sentiment', 'positive', 'negative', 'neutral']):
+            sentiment_counts = df['sentiment'].value_counts()
+            response = [
+                "**🎭 Sentiment Analysis:**",
+                ""
+            ]
+            total = len(df)
+            for sentiment, count in sentiment_counts.items():
+                percentage = (count / total) * 100
+                response.append(f"- {sentiment}: {count:,} reviews ({percentage:.1f}%)")
+            
+            # Sentiment by category if available
+            if 'main_category' in df.columns:
+                top_categories = df['main_category'].value_counts().head(5).index
+                response.extend([
+                    "",
+                    "**🏷️ Sentiment in Top Categories:**"
+                ])
+                for category in top_categories:
+                    cat_data = df[df['main_category'] == category]
+                    cat_sentiment = cat_data['sentiment'].value_counts(normalize=True) * 100
+                    if 'Positive' in cat_sentiment:
+                        response.append(f"- {category}: {cat_sentiment['Positive']:.1f}% positive")
+            
+            return "\n".join(response)
+        
+        # Category analysis
+        elif any(word in query_lower for word in ['category', 'categories', 'product type']):
+            if 'main_category' in df.columns:
+                category_counts = df['main_category'].value_counts().head(10)
+                response = [
+                    "**🏷️ Category Analysis:**",
+                    "",
+                    "**Top Categories by Review Volume:**"
+                ]
+                
+                for category, count in category_counts.items():
+                    response.append(f"- {category}: {count:,} reviews")
+                
+                # Average rating by category
+                if 'rating' in df.columns:
+                    avg_rating_by_cat = df.groupby('main_category')['rating'].mean().sort_values(ascending=False).head(5)
+                    response.extend([
+                        "",
+                        "**⭐ Highest Rated Categories:**"
+                    ])
+                    for category, rating in avg_rating_by_cat.items():
+                        response.append(f"- {category}: {rating:.2f}⭐")
+                
+                return "\n".join(response)
+
+        # Marketing prioritization request
+        if any(word in query_lower for word in ['priorit', 'marketing', 'invest', 'investment', 'prioritize']):
+            return enhanced_category_marketing_analysis(query, df)
+        
+        # Default overview
+        return f"""
+**📊 Dataset Overview (Enhanced Analysis):**
+
+**Basic Statistics:**
+- Total reviews: {len(df):,}
+- Categories: {df['main_category'].nunique() if 'main_category' in df.columns else 'N/A'}
+- Date range: {df['review_date'].min().strftime('%Y-%m-%d') if 'review_date' in df.columns else 'N/A'} to {df['review_date'].max().strftime('%Y-%m-%d') if 'review_date' in df.columns else 'N/A'}
+- Average rating: {df['rating'].mean():.2f}⭐
+- Positive sentiment: {(df['sentiment'] == 'Positive').mean()*100:.1f}% if available
+
+**Data Quality Notes:**
+- Price data: {df['price'].notna().sum() if 'price' in df.columns else 0} of {len(df)} records have price information
+- Review text: {df['review_text'].notna().sum() if 'review_text' in df.columns else 0} records have detailed reviews
+
+*Note: Advanced agent analysis is temporarily unavailable. Basic statistics shown above.*
+"""
+            
+    except Exception as e:
+        return f"Enhanced analysis failed: {str(e)}"
+
+
+def enhanced_category_marketing_analysis(query, df):
+    """Compare average rating and review volume across top 5 categories over the last 3 years and recommend a category to prioritize."""
+    try:
+        if 'review_date' not in df.columns or 'rating' not in df.columns or 'main_category' not in df.columns:
+            return "Marketing prioritization requires 'review_date', 'rating' and 'main_category' columns."
+
+        # Robust date parsing
+        df_local = df.copy()
+        df_local['review_date'] = pd.to_datetime(df_local['review_date'], errors='coerce')
+        df_local = df_local[df_local['review_date'].notna()]
+        if df_local.empty:
+            return "No valid review_date data available for the requested period."
+
+        max_year = df_local['review_date'].dt.year.max()
+        last_three = df_local[df_local['review_date'].dt.year.between(max_year-2, max_year)]
+
+        if last_three.empty:
+            return "No reviews found in the last three years."
+
+        # Compute metrics
+        cat_stats = last_three.groupby('main_category').agg(
+            avg_rating=('rating', 'mean'),
+            review_volume=('asin', 'count')
+        )
+
+        if cat_stats.empty:
+            return "No category statistics available."
+
+        # Select top 5 by review volume
+        top5 = cat_stats.sort_values('review_volume', ascending=False).head(5)
+
+        # Compute simple growth score: prefer categories with increasing volume year-over-year
+        yoy = last_three.copy()
+        yoy['year'] = yoy['review_date'].dt.year
+        yoy_counts = yoy.groupby(['main_category', 'year']).size().unstack(fill_value=0)
+
+        growth_scores = {}
+        for cat in top5.index:
+            if cat in yoy_counts.index:
+                years = sorted(yoy_counts.columns)
+                if len(years) >= 2:
+                    # compute CAGR-like trend via slope
+                    vals = yoy_counts.loc[cat].reindex(years, fill_value=0).values
+                    x = list(range(len(vals)))
+                    vx = pd.Series(x)
+                    vy = pd.Series(vals)
+                    denom = ((vx - vx.mean())**2).sum()
+                    slope = ((vx - vx.mean())*(vy - vy.mean())).sum() / denom if denom != 0 else 0
+                else:
+                    slope = 0
+            else:
+                slope = 0
+            growth_scores[cat] = slope
+
+        # Add growth score to top5
+        top5['growth_score'] = [growth_scores.get(cat, 0) for cat in top5.index]
+
+        # Ranking heuristic: prefer high growth and high avg rating weighted by volume
+        # score = normalize(growth) * 0.5 + normalize(avg_rating) * 0.3 + normalize(volume) * 0.2
+        norm = lambda s: (s - s.min()) / (s.max() - s.min()) if s.max() != s.min() else 0.0
+        growth_norm = pd.Series(top5['growth_score']).fillna(0)
+        rating_norm = pd.Series(top5['avg_rating']).fillna(0)
+        vol_norm = pd.Series(top5['review_volume']).fillna(0)
+
+        g_n = norm(growth_norm)
+        r_n = norm(rating_norm)
+        v_n = norm(vol_norm)
+
+        score = 0.5 * g_n + 0.3 * r_n + 0.2 * v_n
+        top5['priority_score'] = score.values
+
+        # Recommend top category
+        recommended = top5.sort_values('priority_score', ascending=False).iloc[0]
+
+        # Build response
+        response = ["**📣 Category Marketing Prioritization (Last 3 Years)**", ""]
+        response.append("**Top 5 Categories by Review Volume (last 3 years):**")
+        for cat, row in top5.iterrows():
+            response.append(f"- {cat}: {int(row['review_volume']):,} reviews, avg rating {row['avg_rating']:.2f}, growth_score {row['growth_score']:.3f}")
+
+        response.append("")
+        response.append(f"**Recommendation:** Prioritize **{recommended.name}** — it has the highest combined score (priority_score={recommended['priority_score']:.3f}).")
+        response.append("")
+        response.append("**Rationale:** This ranking balances recent growth in review volume (demand signal), average rating (quality signal), and absolute review volume (reach).")
+        response.append("")
+        response.append("**Actionable Next Steps:**")
+        response.append("1. Allocate marketing budget to targeted campaigns in the recommended category focusing on best-selling SKUs.")
+        response.append("2. Run A/B tests for product detail page improvements in that category.")
+        response.append("3. Monitor weekly review volume and sentiment for early warning signals.")
+
+        return "\n".join(response)
+
+    except Exception as e:
+        return f"Marketing analysis failed: {str(e)}"
 
 def fallback_analysis(query, df):
     """Fallback analysis when agent fails"""
@@ -304,7 +644,7 @@ def create_rating_trend_visualization(df, response_text):
         fig = px.line(rating_trends, x=rating_trends.index, y=rating_trends.columns,
                      labels={'value': 'Average Rating', 'year': 'Year'},
                      title='Average Rating Trends by Category (Yearly)')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig)
         st.markdown("#### 📋 Rating Trend Table")
         st.dataframe(rating_trends.round(2))
         # --- Insights ---
@@ -351,7 +691,7 @@ def create_seasonal_visualization(df, response_text):
                 labels={'x': 'Month', 'y': 'Number of Reviews'},
                 title='Review Volume by Month'
             )
-            st.plotly_chart(fig_volume, use_container_width=True)
+            st.plotly_chart(fig_volume)
         
         with col2:
             st.subheader("💭 Monthly Sentiment Distribution")
@@ -362,7 +702,7 @@ def create_seasonal_visualization(df, response_text):
                     title='Sentiment Distribution by Month',
                     labels={'value': 'Number of Reviews', 'index': 'Month'}
                 )
-                st.plotly_chart(fig_sentiment, use_container_width=True)
+                st.plotly_chart(fig_sentiment)
                 
     except Exception as e:
         st.error(f"Seasonal visualization failed: {str(e)}")
@@ -385,7 +725,7 @@ def create_sentiment_visualization(df, response_text):
                 names=sentiment_counts.index,
                 title='Overall Sentiment Distribution'
             )
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie)
         
         with col2:
             st.subheader("📊 Sentiment by Rating")
@@ -396,7 +736,7 @@ def create_sentiment_visualization(df, response_text):
                     title='Sentiment Distribution by Rating',
                     labels={'value': 'Number of Reviews', 'index': 'Rating'}
                 )
-                st.plotly_chart(fig_rating, use_container_width=True)
+                st.plotly_chart(fig_rating)
                 
     except Exception as e:
         st.error(f"Sentiment visualization failed: {str(e)}")
@@ -422,7 +762,7 @@ def create_category_visualization(df, response_text):
                 title='Review Count by Category (Top 10)',
                 labels={'x': 'Number of Reviews', 'y': 'Category'}
             )
-            st.plotly_chart(fig_cat, use_container_width=True)
+            st.plotly_chart(fig_cat)
 
         with col2:
             st.subheader("⭐ Average Rating by Category")
@@ -435,7 +775,7 @@ def create_category_visualization(df, response_text):
                     title='Average Rating by Category (Top 10)',
                     labels={'x': 'Average Rating', 'y': 'Category'}
                 )
-                st.plotly_chart(fig_rating, use_container_width=True)
+                st.plotly_chart(fig_rating)
 
                 # --- Actionable Insights ---
                 st.markdown("#### 📊 Analyst Insights: Average Rating Trends by Category")
@@ -476,7 +816,7 @@ def create_rating_visualization(df, response_text):
                 title='Distribution of Ratings',
                 labels={'x': 'Rating (Stars)', 'y': 'Number of Reviews'}
             )
-            st.plotly_chart(fig_dist, use_container_width=True)
+            st.plotly_chart(fig_dist)
         
         with col2:
             st.subheader("📈 Rating Statistics")
@@ -501,10 +841,249 @@ def create_rating_visualization(df, response_text):
                         'thickness': 0.75,
                         'value': 4.5}}
             ))
-            st.plotly_chart(fig_stats, use_container_width=True)
+            st.plotly_chart(fig_stats)
             
     except Exception as e:
         st.error(f"Rating visualization failed: {str(e)}")
+
+def create_ai_driven_visualizations(df, query, response_text):
+    """Create visualizations based on AI analysis and query intent"""
+    
+    query_lower = query.lower()
+    
+    try:
+        # Price-related visualizations
+        if any(word in query_lower for word in ['price', 'cost', 'expensive', 'cheap']):
+            if 'price' in df.columns and df['price'].notna().sum() > 0:
+                create_price_analysis_visualizations(df, response_text)
+                return True
+        
+        # Review length analysis
+        elif any(word in query_lower for word in ['review length', 'review text', 'correlation', 'length', 'word count']):
+            if 'review_text' in df.columns or 'review_title' in df.columns:
+                create_review_length_analysis_visualizations(df, response_text)
+                return True
+        
+        # Seasonal/time visualizations  
+        elif any(word in query_lower for word in ['seasonal', 'month', 'trend', 'over time']):
+            if 'review_date' in df.columns:
+                create_temporal_analysis_visualizations(df, response_text)
+                return True
+        
+        # Category visualizations
+        elif any(word in query_lower for word in ['category', 'categories', 'product type']):
+            if 'main_category' in df.columns:
+                create_category_analysis_visualizations(df, response_text)
+                return True
+        
+        # Sentiment visualizations
+        elif any(word in query_lower for word in ['sentiment', 'positive', 'negative']):
+            if 'sentiment' in df.columns:
+                create_sentiment_analysis_visualizations(df, response_text)
+                return True
+        
+        # Rating visualizations
+        elif any(word in query_lower for word in ['rating', 'stars', 'score']):
+            if 'rating' in df.columns:
+                create_rating_analysis_visualizations(df, response_text)
+                return True
+        
+        return False
+        
+    except Exception as e:
+        st.error(f"Visualization creation failed: {str(e)}")
+        return False
+
+def create_price_analysis_visualizations(df, response_text):
+    """Create comprehensive price analysis visualizations"""
+    try:
+        st.markdown("### 📊 AI-Driven Price Analysis Visualizations")
+        
+        # Filter data with prices
+        price_data = df[df['price'].notna()].copy()
+        if len(price_data) == 0:
+            st.warning("No price data available for visualization")
+            return
+        
+        # Convert price to numeric
+        price_data['price_numeric'] = (
+            price_data['price']
+            .astype(str)
+            .str.replace('$', '', regex=False)
+            .str.replace(',', '', regex=False)
+            .str.strip()
+            .astype(float)
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Price distribution
+            fig_price_dist = px.histogram(
+                price_data, 
+                x='price_numeric',
+                title='Distribution of Product Prices',
+                labels={'price_numeric': 'Price ($)', 'count': 'Number of Products'}
+            )
+            st.plotly_chart(fig_price_dist)
+        
+        with col2:
+            # Price vs Rating scatter plot
+            if 'rating' in price_data.columns:
+                fig_price_rating = px.scatter(
+                    price_data,
+                    x='price_numeric',
+                    y='rating',
+                    title='Price vs Rating Correlation',
+                    labels={'price_numeric': 'Price ($)', 'rating': 'Rating'}
+                )
+                st.plotly_chart(fig_price_rating)
+        
+        # Price ranges analysis
+        price_ranges = [0, 25, 50, 100, 200, float('inf')]
+        price_labels = ['<$25', '$25-50', '$50-100', '$100-200', '>$200']
+        
+        price_data['price_range'] = pd.cut(
+            price_data['price_numeric'],
+            bins=price_ranges,
+            labels=price_labels
+        )
+        
+        # Sentiment by price range
+        if 'sentiment' in price_data.columns:
+            sentiment_by_price = price_data.groupby(['price_range', 'sentiment']).size().unstack(fill_value=0)
+            fig_sentiment_price = px.bar(
+                sentiment_by_price,
+                title='Sentiment Distribution by Price Range',
+                labels={'value': 'Number of Reviews', 'index': 'Price Range'}
+            )
+            st.plotly_chart(fig_sentiment_price)
+            
+    except Exception as e:
+        st.error(f"Price visualization failed: {str(e)}")
+
+def create_review_length_analysis_visualizations(df, response_text):
+    """Create review length analysis visualizations including scatter plots"""
+    try:
+        st.markdown("### 📊 Review Length Analysis Visualizations")
+        
+        # Calculate review length
+        df_viz = df.copy()
+        
+        # Combine title and text for review length calculation
+        df_viz['review_title'] = df_viz['review_title'].fillna('')
+        df_viz['review_text'] = df_viz['review_text'].fillna('')
+        df_viz['full_review'] = df_viz['review_title'] + ' ' + df_viz['review_text']
+        df_viz['review_length'] = df_viz['full_review'].str.len()
+        
+        # Remove empty reviews
+        df_viz = df_viz[df_viz['review_length'] > 0]
+        
+        if len(df_viz) == 0:
+            st.warning("No review text available for length analysis")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Scatter plot: Review Length vs Rating
+            st.subheader("📈 Review Length vs Rating")
+            fig_scatter = px.scatter(
+                df_viz,
+                x='review_length',
+                y='rating',
+                title='Review Length vs Rating Correlation',
+                labels={'review_length': 'Review Length (characters)', 'rating': 'Rating'},
+                opacity=0.6  # Makes overlapping points visible
+            )
+            st.plotly_chart(fig_scatter)
+            
+            # Calculate actual correlation
+            correlation = df_viz['review_length'].corr(df_viz['rating'])
+            st.metric("Correlation Coefficient", f"{correlation:.3f}")
+            
+            # Add interpretation
+            if abs(correlation) < 0.1:
+                corr_strength = "Very Weak"
+            elif abs(correlation) < 0.3:
+                corr_strength = "Weak" 
+            elif abs(correlation) < 0.5:
+                corr_strength = "Moderate"
+            else:
+                corr_strength = "Strong"
+                
+            direction = "negative" if correlation < 0 else "positive"
+            st.write(f"**Interpretation:** {corr_strength} {direction} correlation")
+        
+        with col2:
+            # Review length distribution by rating
+            st.subheader("📊 Review Length by Rating")
+            fig_box = px.box(
+                df_viz,
+                x='rating',
+                y='review_length',
+                title='Review Length Distribution by Rating',
+                labels={'rating': 'Rating', 'review_length': 'Review Length (characters)'}
+            )
+            st.plotly_chart(fig_box)
+            
+            # Average review length by rating
+            avg_length_by_rating = df_viz.groupby('rating')['review_length'].mean()
+            st.markdown("**Average Review Length by Rating:**")
+            for rating in sorted(avg_length_by_rating.index):
+                avg_length = avg_length_by_rating[rating]
+                st.write(f"- {rating}⭐: {avg_length:.0f} characters")
+        
+        # Additional insights
+        st.markdown("#### 🧠 Analyst Insights: Review Length Patterns")
+        
+        # Find patterns
+        avg_length_1star = df_viz[df_viz['rating'] == 1]['review_length'].mean()
+        avg_length_5star = df_viz[df_viz['rating'] == 5]['review_length'].mean()
+        
+        st.info(f"""
+        **Key Findings:**
+        - 1-star reviews average: **{avg_length_1star:.0f} characters**
+        - 5-star reviews average: **{avg_length_5star:.0f} characters**
+        - Difference: **{abs(avg_length_1star - avg_length_5star):.0f} characters**
+        - Correlation: **{correlation:.3f}** ({corr_strength.lower()} {direction})
+        """)
+        
+        # Business implications
+        if correlation < 0:
+            st.warning("""
+            **Business Implication:** 
+            There's a slight tendency for dissatisfied customers to write longer, more detailed reviews. 
+            This suggests that negative feedback often contains more specific complaints and explanations.
+            **Action:** Focus on analyzing detailed negative reviews for product improvement opportunities.
+            """)
+        else:
+            st.success("""
+            **Business Implication:** 
+            Positive reviews tend to be more detailed, suggesting satisfied customers are motivated to share their experiences.
+            **Action:** Encourage satisfied customers to elaborate on what they liked about the product.
+            """)
+            
+    except Exception as e:
+        st.error(f"Review length visualization failed: {str(e)}")
+        # Debug information
+        st.write(f"Error details: {str(e)}")
+
+def create_temporal_analysis_visualizations(df, response_text):
+    """Create temporal/seasonal analysis visualizations"""
+    create_seasonal_visualization(df, response_text)
+
+def create_category_analysis_visualizations(df, response_text):
+    """Create category analysis visualizations"""
+    create_category_visualization(df, response_text)
+
+def create_sentiment_analysis_visualizations(df, response_text):
+    """Create sentiment analysis visualizations"""
+    create_sentiment_visualization(df, response_text)
+
+def create_rating_analysis_visualizations(df, response_text):
+    """Create rating analysis visualizations"""
+    create_rating_visualization(df, response_text)
 
 def create_agent_visualization(response_text, query):
     """Create visualizations based on agent analysis results"""
@@ -676,7 +1255,12 @@ def render_interactive_analyst_tab(df_filtered):
         
         # Visualization
         if latest.get('used_agent'):
-            create_agent_visualization(latest['answer'], latest['question'])
+            # Try AI-driven visualizations first
+            viz_created = create_ai_driven_visualizations(df_filtered, latest['question'], latest['answer'])
+            
+            # If no specific visualization was created, fall back to keyword-based
+            if not viz_created:
+                create_agent_visualization(latest['answer'], latest['question'])
     
     # Show history
     if len(st.session_state.get('analyst_history', [])) > 1:

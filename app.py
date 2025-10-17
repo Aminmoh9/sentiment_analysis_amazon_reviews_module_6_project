@@ -16,7 +16,7 @@ from components.advanced_tab import render_advanced_tab
 from components.data_explorer_tab import render_data_explorer_tab
 from components.interactive_chatbot_tab import render_interactive_chatbot_tab
 from components.interactive_analyst_tab import render_interactive_analyst_tab
-from components.interactive_sentiment_tab import render_interactive_sentiment_tab
+
 
 def configure_page():
     """Configure Streamlit page settings"""
@@ -130,8 +130,6 @@ def main():
         render_interactive_analyst_tab(df_filtered)
     
     # Tab 8: Sentiment Detective (Interactive Sentiment)
-    with tabs[7]:
-        render_interactive_sentiment_tab(df_filtered)
     
     # Footer
     with st.sidebar:
@@ -154,7 +152,6 @@ def main():
         **🚀 Features:**
         - 📊 Interactive analytics
         - 🤖 AI-powered chatbot
-        - 🎭 Advanced sentiment analysis
         - 📱 Responsive design
         - 💾 Data export capabilities
         """)

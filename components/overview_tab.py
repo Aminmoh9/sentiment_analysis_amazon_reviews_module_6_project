@@ -81,8 +81,8 @@ def render_overview_tab(df_filtered):
             color_discrete_map=SENTIMENT_COLORS
         )
         fig_sentiment.update_traces(textposition='inside', textinfo='percent+label')
-        st.plotly_chart(fig_sentiment, config={'displayModeBar': False}, use_container_width=True)
-    
+        st.plotly_chart(fig_sentiment, config={'displayModeBar': False})
+
     with chart_col2:
         # Rating distribution
         rating_dist = df_filtered['rating'].value_counts().sort_index()
@@ -97,4 +97,4 @@ def render_overview_tab(df_filtered):
         fig_ratings.update_xaxes(title="Rating Stars")
         fig_ratings.update_yaxes(title="Number of Reviews")
         fig_ratings.update_layout(showlegend=False)
-        st.plotly_chart(fig_ratings, config={'displayModeBar': False}, use_container_width=True)
+        st.plotly_chart(fig_ratings, config={'displayModeBar': False})

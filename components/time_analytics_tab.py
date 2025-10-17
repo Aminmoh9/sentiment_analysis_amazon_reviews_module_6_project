@@ -36,7 +36,7 @@ def render_time_analytics_tab(df_filtered):
         height=500,
         hovermode='x unified'
     )
-    st.plotly_chart(fig_timeline, config={'displayModeBar': False}, use_container_width=True)
+    st.plotly_chart(fig_timeline, config={'displayModeBar': False})
     
     # Yearly analysis section
     col1, col2 = st.columns(2)
@@ -44,7 +44,6 @@ def render_time_analytics_tab(df_filtered):
     with col1:
         st.subheader("📊 Reviews by Year")
         yearly_counts = df_filtered['year'].value_counts().sort_index()
-        
         fig_yearly = px.bar(
             x=yearly_counts.index,
             y=yearly_counts.values,
@@ -58,12 +57,11 @@ def render_time_analytics_tab(df_filtered):
         fig_yearly.update_xaxes(title="Year")
         fig_yearly.update_yaxes(title="Number of Reviews")
         fig_yearly.update_layout(showlegend=False)
-        st.plotly_chart(fig_yearly, config={'displayModeBar': False}, use_container_width=True)
-    
+        st.plotly_chart(fig_yearly, config={'displayModeBar': False})
+
     with col2:
         st.subheader("⭐ Average Rating by Year")
         yearly_ratings = df_filtered.groupby('year')['rating'].mean()
-        
         fig_rating_year = px.line(
             x=yearly_ratings.index,
             y=yearly_ratings.values,
@@ -78,7 +76,7 @@ def render_time_analytics_tab(df_filtered):
         )
         fig_rating_year.update_xaxes(title="Year")
         fig_rating_year.update_yaxes(title="Average Rating (1-5 Stars)", range=[1, 5])
-        st.plotly_chart(fig_rating_year, config={'displayModeBar': False}, use_container_width=True)
+        st.plotly_chart(fig_rating_year, config={'displayModeBar': False})
     
     # Additional temporal insights
     st.subheader("📅 Temporal Insights")

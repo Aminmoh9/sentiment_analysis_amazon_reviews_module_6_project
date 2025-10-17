@@ -71,7 +71,7 @@ def render_data_explorer_tab(df_filtered):
             
             # Show sample data
             sample_df = df_filtered[display_columns].head(num_records)
-            st.dataframe(sample_df, use_container_width=True, height=400)
+            st.dataframe(sample_df, width=900, height=400)
             
             # Data quality info
             with st.expander("📋 Data Quality Summary"):

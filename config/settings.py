@@ -31,8 +31,7 @@ TAB_NAMES = [
     "🔍 Advanced Analytics", 
     "📋 Data Explorer",
     "🤖 Product Assistant",
-    "🔍 Data Analyst",
-    "🎭 Sentiment Detective"
+    "🔍 Data Analyst"
 ]
 
 # Default columns for data explorer
@@ -62,7 +61,6 @@ CHAT_MODELS = {
         "cost_per_1k_tokens": 0.03
     }
 }
-
 # Price ranges for analysis
 PRICE_RANGES = [0, 50, 100, 200, 500, float('inf')]
 PRICE_LABELS = ['<$50', '$50-100', '$100-200', '$200-500', '>$500']

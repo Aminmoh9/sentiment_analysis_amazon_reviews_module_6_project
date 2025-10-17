@@ -15,23 +15,18 @@ def render_advanced_tab(df_filtered):
     
     with col1:
         st.subheader("📝 Review Length Analysis")
-        
         # Create a copy to avoid SettingWithCopyWarning
         df_analysis = df_filtered.copy()
-        
         # Find available text column
         text_column = None
         possible_text_columns = ['reviewText', 'review_text', 'summary', 'text', 'review', 'content']
-        
         for col in possible_text_columns:
             if col in df_analysis.columns:
                 text_column = col
                 break
-        
         if text_column is None:
             st.error("❌ No text column found for length analysis. Available columns: " + ", ".join(df_analysis.columns.tolist()))
             return
-        
         # Length analysis option selector
         length_metric = st.radio(
             "Choose length metric:",
@@ -39,7 +34,6 @@ def render_advanced_tab(df_filtered):
             horizontal=True,
             help="Characters: total character count | Words: word count (more intuitive)"
         )
-        
         if length_metric == "Words":
             # Word count calculation
             df_analysis['review_length'] = df_analysis[text_column].str.split().str.len()
@@ -61,10 +55,8 @@ def render_advanced_tab(df_filtered):
                 labels=REVIEW_LENGTH_LABELS
             )
             length_unit = "characters"
-        
         # Calculate average rating by length category
         length_rating = df_analysis.groupby('length_category', observed=False)['rating'].mean()
-        
         fig_length = px.bar(
             x=length_rating.index,
             y=length_rating.values,
@@ -78,8 +70,7 @@ def render_advanced_tab(df_filtered):
         fig_length.update_xaxes(title="Review Length Category")
         fig_length.update_yaxes(title="Average Rating (Stars)", range=[0, 5])
         fig_length.update_layout(showlegend=False)
-        st.plotly_chart(fig_length, config={'displayModeBar': False}, use_container_width=True)
-        
+        st.plotly_chart(fig_length, config={'displayModeBar': False})
         # Review length insights
         avg_length = df_analysis['review_length'].mean()
         median_length = df_analysis['review_length'].median()
@@ -128,7 +119,7 @@ def render_advanced_tab(df_filtered):
                     fig_price.update_xaxes(title="Price Range")
                     fig_price.update_yaxes(title="Average Rating (Stars)", range=[0, 5])
                     fig_price.update_layout(showlegend=False)
-                    st.plotly_chart(fig_price, config={'displayModeBar': False}, use_container_width=True)
+                    st.plotly_chart(fig_price, config={'displayModeBar': False})
                     
                     # Price insights in info card (matching Review Length format)
                     avg_price = price_data['price_numeric'].mean()
@@ -164,18 +155,15 @@ def render_advanced_tab(df_filtered):
     
     with sentiment_col1:
         st.subheader("📊 Sentiment by Category")
-        
         # Calculate sentiment distribution by category
         sentiment_category = pd.crosstab(
             df_filtered['main_category'], 
             df_filtered['sentiment'], 
             normalize='index'
         ) * 100
-        
         # Show top 8 categories by volume
         top_categories_sentiment = df_filtered['main_category'].value_counts().head(8).index
         sentiment_category_top = sentiment_category.loc[top_categories_sentiment]
-        
         fig_sent_cat = px.bar(
             sentiment_category_top,
             title="Sentiment Distribution by Category (%)",
@@ -186,15 +174,13 @@ def render_advanced_tab(df_filtered):
         fig_sent_cat.update_xaxes(title="Product Category", tickangle=45)
         fig_sent_cat.update_yaxes(title="Percentage (%)")
         fig_sent_cat.update_layout(height=500)
-        st.plotly_chart(fig_sent_cat, config={'displayModeBar': False}, use_container_width=True)
+        st.plotly_chart(fig_sent_cat, config={'displayModeBar': False})
     
     with sentiment_col2:
         st.subheader("📈 Sentiment Over Time")
-        
         # Calculate sentiment trends over time
         sentiment_time = df_filtered.groupby([df_filtered['year'], 'sentiment']).size().unstack(fill_value=0)
         sentiment_time_pct = sentiment_time.div(sentiment_time.sum(axis=1), axis=0) * 100
-        
         fig_sent_time = px.line(
             sentiment_time_pct,
             title="Sentiment Trends Over Time (%)",
@@ -206,7 +192,7 @@ def render_advanced_tab(df_filtered):
         fig_sent_time.update_xaxes(title="Year")
         fig_sent_time.update_yaxes(title="Percentage (%)", range=[0, 100])
         fig_sent_time.update_layout(height=500)
-        st.plotly_chart(fig_sent_time, config={'displayModeBar': False}, use_container_width=True)
+        st.plotly_chart(fig_sent_time, config={'displayModeBar': False})
     
     # Advanced insights section
     st.subheader("🔍 Advanced Insights")
